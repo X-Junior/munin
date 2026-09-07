@@ -146,8 +146,6 @@ def main():
 
     if analyzer_url and analyzer_url != '-':
         send_to_analyzer(csv_filename, analyzer_url)
-    else:
-        print("[*] RETROHUNT_ANALYZER_URL not configured — skipping analyzer service")
 
 
 if __name__ == '__main__':
