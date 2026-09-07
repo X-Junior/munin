@@ -125,10 +125,12 @@ def main():
         except KeyError as e:
             print("[E] Your config misses the PROXY field - check the new munin.ini template and add it to your "
                   "config to avoid this error.")
+        analyzer_url = config['DEFAULT'].get('RETROHUNT_ANALYZER_URL', '-').strip()
     except Exception as e:
         traceback.print_exc()
         print("[E] Config file '%s' not found or missing field - check the template munin.ini if fields have "
               "changed" % args.i)
+        analyzer_url = '-'
 
     print("[+] Retrieving Retrohunt results ...")
     found_files = munin_vt.getRetrohuntResults(args.r, not args.comments, args.debug)
@@ -141,6 +143,11 @@ def main():
     for i, file_info in enumerate(found_files):
         printResult(file_info, i, len(found_files))
         writeCSV(file_info, csv_filename)
+
+    if analyzer_url and analyzer_url != '-':
+        send_to_analyzer(csv_filename, analyzer_url)
+    else:
+        print("[*] RETROHUNT_ANALYZER_URL not configured — skipping analyzer service")
 
 
 if __name__ == '__main__':
