@@ -15,6 +15,8 @@ import subprocess
 import tempfile
 import time
 import traceback
+import io
+import zipfile
 
 from colorama import init, Fore, Back, Style
 
@@ -23,6 +25,62 @@ import lib.munin_vt as munin_vt
 import lib.connections as connections
 from lib.helper import generateResultFilename
 from lib.munin_stdout import printResult
+
+
+def send_to_analyzer(csv_path: str, url: str) -> None:
+    """POST *csv_path* to the retrohunt-analyzer-service and write the
+    returned files (HTML report + optional enriched CSV) next to the CSV.
+
+    The service endpoint is ``POST {url}/api/v1/reports`` which returns an
+    ``application/zip`` archive.  Any file inside the ZIP is extracted to the
+    same directory as *csv_path*.
+
+    All errors are caught and printed as warnings so the caller's flow is
+    never interrupted.
+
+    Args:
+        csv_path: Path to the retrohunt results CSV produced by hugin.
+        url: Base URL of the retrohunt-analyzer-service, e.g.
+             ``http://retrohunt-analyzer.internal:8000``.
+    """
+    endpoint = url.rstrip("/") + "/api/v1/reports"
+    out_dir = os.path.dirname(os.path.abspath(csv_path))
+
+    print("[*] Sending retrohunt CSV to analyzer service: %s" % endpoint)
+    try:
+        with open(csv_path, "rb") as fh:
+            response = requests.post(
+                endpoint,
+                files={"file": (os.path.basename(csv_path), fh, "text/csv")},
+                timeout=120,
+            )
+    except Exception as exc:
+        print("[W] Could not reach retrohunt-analyzer-service: %s" % exc)
+        return
+
+    if response.status_code != 200:
+        print("[W] Retrohunt-analyzer-service returned HTTP %d: %s"
+              % (response.status_code, response.text[:200]))
+        return
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+            names = zf.namelist()
+            for name in names:
+                out_path = os.path.join(out_dir, os.path.basename(name))
+                with zf.open(name) as src, open(out_path, "wb") as dst:
+                    dst.write(src.read())
+                print("[+] Analyzer output saved: %s" % out_path)
+    except Exception as exc:
+        print("[W] Failed to extract analyzer response: %s" % exc)
+        return
+
+    enriched = any(n.endswith("_enriched.csv") for n in names)
+    if enriched:
+        print("[+] Enriched CSV included (Valhalla configured on service)")
+    else:
+        print("[*] No enriched CSV in response (Valhalla not configured on service)")
+
 
 def main():
     init(autoreset=False)
