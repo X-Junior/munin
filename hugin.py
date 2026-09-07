@@ -40,8 +40,7 @@ def send_to_analyzer(csv_path: str, url: str) -> None:
 
     Args:
         csv_path: Path to the retrohunt results CSV produced by hugin.
-        url: Base URL of the retrohunt-analyzer-service, e.g.
-             ``http://retrohunt-analyzer.internal:8000``.
+        url: Base URL of the retrohunt-analyzer-service
     """
     endpoint = url.rstrip("/") + "/api/v1/reports"
     out_dir = os.path.dirname(os.path.abspath(csv_path))
